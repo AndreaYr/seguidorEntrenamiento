@@ -14,7 +14,7 @@ const HomeCalendar = () => {
               visualiza tus sesiones y mantén tu progreso siempre a la vista.</p>
           </div>
 
-          <img src={Calendario} alt="Calendario de entrenamiento" className="w-full max-w-md rounded-2xl shadow-lg object-cover border border-white/10 hover:scale-105 transition-transform duration-500" />'
+          <img src={Calendario} alt="Calendario de entrenamiento" className="w-full max-w-md rounded-2xl shadow-lg object-cover border border-white/10 hover:scale-105 transition-transform duration-500" />
         </div>
       </section>
     );

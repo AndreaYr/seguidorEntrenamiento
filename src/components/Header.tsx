@@ -9,9 +9,9 @@ const Header = () => {
         <h1 className="text-2xl font-bold text-white">Seguidor de entrenamiento</h1>
         <div className="space-x-4"> 
           <a href="/" className="text-white hover:text-[#E63946]">Inicio</a>
+          <a href="/dashboard" className="text-white hover:text-[#E63946]">Dashboard</a>
           <a href="/about" className="text-white hover:text-[#E63946]">Nosotros</a>
           <a href="/contact" className="text-white hover:text-[#E63946]">Acerca de</a>
-          <a href="/blog" className="text-white hover:text-[#E63946]">Blog</a>
         </div>
         <div className="flex items-center space-x-4 pr-8">
           <button onClick={() => navigate("/login")} className="px-4 py-2 bg-[#E63946] text-white rounded font-semibold hover:bg-[#b62734]">Iniciar Sesión</button>
