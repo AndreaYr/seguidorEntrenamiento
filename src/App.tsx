@@ -16,7 +16,7 @@ import EntrenamientosList from './pages/entrenamientos/EntrenamientosList';
 import EntrenamientoDetail from './pages/entrenamientos/EntrenamientoDetail';
 import EntrenamientoCreate from './pages/entrenamientos/EntrenamientoCreate';
 import EntrenamientoEdit from './pages/entrenamientos/EntrenamientoEdit';
-import EntrenamientoDelete from './pages/entrenamientos/EntrenamientoDelete';
+//import EntrenamientoDelete from './pages/entrenamientos/EntrenamientoDelete';
 
 // Ejercicios
 import EjerciciosList from './pages/ejercicios/EjerciciosList';
@@ -78,9 +78,8 @@ function App() {
         {/* Entrenamientos Routes */}
         <Route path="/entrenamientos" element={<EntrenamientosList />} />
         <Route path="/entrenamientos/crear" element={<EntrenamientoCreate />} />
-        <Route path="/entrenamientos/:id" element={<EntrenamientoDetail />} />
         <Route path="/entrenamientos/editar/:id" element={<EntrenamientoEdit />} />
-        <Route path="/entrenamientos/eliminar/:id" element={<EntrenamientoDelete />} />
+        <Route path="/entrenamientos/ver/:id" element={<EntrenamientoDetail />} />
         
         {/* Ejercicios Routes */}
         <Route path="/ejercicios" element={<EjerciciosList />} />

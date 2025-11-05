@@ -19,9 +19,9 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         <h2 className="text-2xl font-bold mb-8 text-center">SportTrack</h2>
         <nav className="space-y-2">
           <Link
-            to="/"
+            to="/dashboard"
             className={`block px-4 py-2 rounded hover:bg-indigo-700 transition ${
-              location.pathname === '/' ? 'bg-indigo-700' : ''
+              location.pathname === '/dashboard' ? 'bg-indigo-700' : ''
             }`}
           >
             🏠 Inicio

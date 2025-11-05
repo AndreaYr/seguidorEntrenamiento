@@ -8,8 +8,7 @@ const Header = () => {
     <header className="flex bg-black justify-between items-center p-4 shadow-md">
         <h1 className="text-2xl font-bold text-white">Seguidor de entrenamiento</h1>
         <div className="space-x-4"> 
-          <a href="/" className="text-white hover:text-[#E63946]">Inicio</a>
-          <a href="/dashboard" className="text-white hover:text-[#E63946]">Dashboard</a>
+          <a href="/dashboard" className="text-white hover:text-[#E63946]">Inicio</a>
           <a href="/about" className="text-white hover:text-[#E63946]">Nosotros</a>
           <a href="/contact" className="text-white hover:text-[#E63946]">Acerca de</a>
         </div>
