@@ -84,7 +84,7 @@ const UsuarioCreate = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-      });
+      }); 
 
       console.log('✅ Respuesta del servidor:', response.data);
 
