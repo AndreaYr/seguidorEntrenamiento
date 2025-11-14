@@ -60,7 +60,7 @@ const EntrenamientoCreate = () => {
     const cargarDeportistas = async () => {
       try {
         setCargandoDeportistas(true);
-        const response = await axios.get('http://localhost:3000/deportistas');
+        const response = await axios.get('http://localhost:3000/entrenamientos');
         console.log('Deportistas cargados:', response.data);
         setDeportistas(response.data);
         

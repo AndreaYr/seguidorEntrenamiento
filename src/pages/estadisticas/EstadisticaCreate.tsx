@@ -1,27 +1,62 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { mockUsuarios } from '../../data/mockData';
+import axios from 'axios';
+
 
 const EstadisticaCreate = () => {
   const navigate = useNavigate();
-  const deportistas = mockUsuarios.filter(u => u.tipo === 'deportista');
+  const [deportistas, setDeportistas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
   
   const [formData, setFormData] = useState({
-    deportistaId: deportistas[0]?.id || '',
-    periodoInicio: '',
-    periodoFin: '',
-    mejoraTiempos: '',
-    incrementoResistencia: '',
-    distanciaTotal: '',
+    id_deportista: '',
+    fechaInicio: '',
+    fechaFin: '',
     caloriasTotales: '',
+    distanciaTotal: '',
+    velocidadPromedio: '',
     entrenamientosRealizados: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  //Obtener deportistas
+  useEffect(() => {
+    const fetchDeportistas = async () => {
+      try{
+        const response = await axios.get('http://localhost:3000/deportistas')
+        setDeportistas(response.data);
+
+      }catch(error){
+        console.error('Error cargando deportistas', error);
+      }finally{
+        setLoading(false);
+      }
+    }
+    fetchDeportistas();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Reporte generado exitosamente!');
-    navigate('/estadisticas');
+
+    try{  
+        await axios.post('http://localhost:3000/reportes', {
+        id_deportista: Number(formData.id_deportista),
+        fechaInicio: formData.fechaInicio,
+        fechaFin: formData.fechaFin,
+        caloriasTotales: Number(formData.caloriasTotales),
+        distanciaTotal: Number(formData.distanciaTotal),
+        velocidadPromedio: Number(formData.velocidadPromedio),
+        entrenamientosRealizados: Number(formData.entrenamientosRealizados)
+      
+      } );
+
+      alert('✅ Reporte generado exitosamente');
+      navigate('/estadisticas');
+    }catch(error){
+      console.error('Error al crear el reporte:', error);
+      alert('❌ Error al generar el reporte');
+    }
   };
 
   return (
@@ -33,13 +68,14 @@ const EstadisticaCreate = () => {
             <label className="block font-semibold mb-2">Deportista *</label>
             <select
               required
-              value={formData.deportistaId}
-              onChange={(e) => setFormData({ ...formData, deportistaId: e.target.value })}
-              className="w-full px-4 py-2 border rounded-lg"
-            >
+              value={formData.id_deportista}
+              onChange={(e) => setFormData({ ...formData, id_deportista: e.target.value })}
+              className="w-full px-4 py-2 border rounded-lg">
+              <option value="">Seleccione un deportista</option> {/* ✅ Opción por defecto */}
+
               {deportistas.map(deportista => (
-                <option key={deportista.id} value={deportista.id}>
-                  {deportista.nombres} {deportista.apellidos}
+                <option key={deportista.id_deportista} value={deportista.id_deportista}>
+                  {deportista.nombre} {deportista.apellido}
                 </option>
               ))}
             </select>
@@ -47,22 +83,22 @@ const EstadisticaCreate = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block font-semibold mb-2">Periodo Inicio *</label>
+              <label className="block font-semibold mb-2">Fecha de Inicio *</label>
               <input
                 type="date"
                 required
-                value={formData.periodoInicio}
-                onChange={(e) => setFormData({ ...formData, periodoInicio: e.target.value })}
+                value={formData.fechaInicio}
+                onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
                 className="w-full px-4 py-2 border rounded-lg"
               />
             </div>
             <div>
-              <label className="block font-semibold mb-2">Periodo Fin *</label>
+              <label className="block font-semibold mb-2">Fecha Fin *</label>
               <input
                 type="date"
                 required
-                value={formData.periodoFin}
-                onChange={(e) => setFormData({ ...formData, periodoFin: e.target.value })}
+                value={formData.fechaFin}
+                onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
                 className="w-full px-4 py-2 border rounded-lg"
               />
             </div>
@@ -72,29 +108,18 @@ const EstadisticaCreate = () => {
             <h3 className="font-semibold mb-4">Métricas de Progreso</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block font-semibold mb-2">Mejora de Tiempos (%)</label>
+                <label className="block font-semibold mb-2">Calorias Totales (%)</label>
                 <input
                   type="number"
                   step="0.1"
                   required
-                  value={formData.mejoraTiempos}
-                  onChange={(e) => setFormData({ ...formData, mejoraTiempos: e.target.value })}
+                  value={formData.caloriasTotales}
+                  onChange={(e) => setFormData({ ...formData, caloriasTotales: e.target.value })}
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
               <div>
-                <label className="block font-semibold mb-2">Incremento Resistencia (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  required
-                  value={formData.incrementoResistencia}
-                  onChange={(e) => setFormData({ ...formData, incrementoResistencia: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-2">Distancia Total (km)</label>
+                <label className="block font-semibold mb-2"> Distancia Total (km)</label>
                 <input
                   type="number"
                   step="0.1"
@@ -105,16 +130,17 @@ const EstadisticaCreate = () => {
                 />
               </div>
               <div>
-                <label className="block font-semibold mb-2">Calorías Totales</label>
+                <label className="block font-semibold mb-2">Velocidad Promedio </label>
                 <input
                   type="number"
+                  step="0.1"
                   required
-                  value={formData.caloriasTotales}
-                  onChange={(e) => setFormData({ ...formData, caloriasTotales: e.target.value })}
+                  value={formData.velocidadPromedio}
+                  onChange={(e) => setFormData({ ...formData, velocidadPromedio: e.target.value })}
                   className="w-full px-4 py-2 border rounded-lg"
                 />
               </div>
-            </div>
+              </div>
           </div>
 
           <div>

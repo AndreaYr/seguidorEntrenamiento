@@ -1,14 +1,49 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { mockEstadisticas, mockUsuarios } from '../../data/mockData';
+import axios from 'axios';
+
+interface Deportista {
+  id_deportista: number;
+  nombre: string;
+  apellido: string;
+}
+
+interface Reporte {
+  id_reporte: number;
+  id_deportista: number;
+  fechaInicio: string;
+  fechaFin: string;
+  caloriasTotales: number;
+  distanciaTotal: number;
+  velocidadPromedio: number;
+  entrenamientosRealizados: number;
+}
 
 const EstadisticasList = () => {
-  const [estadisticas] = useState(mockEstadisticas);
+  const [estadisticas, setEstadisticas] = useState<Reporte[]>([]);
+  const [deportistas, setDeportistas] = useState<Deportista[]>([]);
 
-  const getDeportistaName = (id: string) => {
-    const usuario = mockUsuarios.find(u => u.id === id);
-    return usuario ? `${usuario.nombres} ${usuario.apellidos}` : id;
+  useEffect(() => {
+    const fetchData = async () => {
+      try{
+        const [reportesRes, deportistasRes] = await Promise.all([
+          axios.get('http://localhost:3000/reportes'),
+          axios.get('http://localhost:3000/deportistas')
+        ]);
+        setEstadisticas(reportesRes.data);
+        setDeportistas(deportistasRes.data);
+      }catch(error){
+        console.error('❌ Error al cargar datos:', error);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  const getDeportistaName = (id: number) => {
+    const deportista = deportistas.find(u => u.id_deportista === id);
+    return deportista ? `${deportista.nombre} ${deportista.apellido}` : id;
   };
 
   return (
@@ -24,41 +59,59 @@ const EstadisticasList = () => {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {estadisticas.map(est => (
-            <div key={est.id} className="border rounded-lg p-4 hover:shadow-lg transition">
-              <h3 className="font-bold text-lg mb-2">{getDeportistaName(est.deportistaId)}</h3>
-              <p className="text-sm text-gray-600 mb-3">
-                {est.periodoInicio} - {est.periodoFin}
-              </p>
-              <div className="space-y-2 mb-4">
-                <p><span className="font-semibold">Mejora:</span> +{est.metricas.mejoraTiempos.toFixed(1)}%</p>
-                <p><span className="font-semibold">Distancia Total:</span> {est.metricas.distanciaTotal} km</p>
-                <p><span className="font-semibold">Calorías:</span> {est.metricas.caloriasTotales}</p>
-                <p><span className="font-semibold">Entrenamientos:</span> {est.metricas.entrenamientosRealizados}</p>
+        {estadisticas.length === 0 ? (
+          <p className="text-gray-600">No hay reportes generados aún.</p>
+
+        ):(
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {estadisticas.map((est) => (
+              <div
+                key={est.id_reporte}
+                className="border rounded-lg p-4 hover:shadow-lg transition"
+              >
+                <h3 className="font-bold text-lg mb-2">
+                  {getDeportistaName(est.id_deportista)}
+                </h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  {est.fechaInicio} - {est.fechaFin}
+                </p>
+                <div className="space-y-2 mb-4">
+                  <p>
+                    <span className="font-semibold">Distancia Total:</span> {est.distanciaTotal} km
+                  </p>
+                  <p>
+                    <span className="font-semibold">Calorías:</span> {est.caloriasTotales}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Velocidad Promedio:</span> {est.velocidadPromedio} km/h
+                  </p>
+                  <p>
+                    <span className="font-semibold">Entrenamientos:</span> {est.entrenamientosRealizados}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Link
+                    to={`/estadisticas/${est.id_reporte}`}
+                    className="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-center"
+                  >
+                    Ver
+                  </Link>
+                  <Link
+                    to={`/estadisticas/eliminar/${est.id_reporte}`}
+                    className="flex-1 px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-center"
+                  >
+                    Eliminar
+                  </Link>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Link
-                  to={`/estadisticas/${est.id}`}
-                  className="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-center"
-                >
-                  Ver
-                </Link>
-                <Link
-                  to={`/estadisticas/eliminar/${est.id}`}
-                  className="flex-1 px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-center"
-                >
-                  Eliminar
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );
 };
-
+  
 export default EstadisticasList;
 
 
