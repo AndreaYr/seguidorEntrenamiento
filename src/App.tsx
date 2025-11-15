@@ -18,20 +18,6 @@ import EntrenamientoCreate from './pages/entrenamientos/EntrenamientoCreate';
 import EntrenamientoEdit from './pages/entrenamientos/EntrenamientoEdit';
 //import EntrenamientoDelete from './pages/entrenamientos/EntrenamientoDelete';
 
-// Ejercicios
-import EjerciciosList from './pages/ejercicios/EjerciciosList';
-import EjercicioDetail from './pages/ejercicios/EjercicioDetail';
-import EjercicioCreate from './pages/ejercicios/EjercicioCreate';
-import EjercicioEdit from './pages/ejercicios/EjercicioEdit';
-import EjercicioDelete from './pages/ejercicios/EjercicioDelete';
-
-// Planes de Entrenamiento
-import PlanesList from './pages/planes/PlanesList';
-import PlanDetail from './pages/planes/PlanDetail';
-import PlanCreate from './pages/planes/PlanCreate';
-import PlanEdit from './pages/planes/PlanEdit';
-import PlanDelete from './pages/planes/PlanDelete';
-
 // Estadísticas
 import EstadisticasList from './pages/estadisticas/EstadisticasList';
 import EstadisticaDetail from './pages/estadisticas/EstadisticaDetail';
@@ -80,21 +66,7 @@ function App() {
         <Route path="/entrenamientos/crear" element={<EntrenamientoCreate />} />
         <Route path="/entrenamientos/editar/:id" element={<EntrenamientoEdit />} />
         <Route path="/entrenamientos/ver/:id" element={<EntrenamientoDetail />} />
-        
-        {/* Ejercicios Routes */}
-        <Route path="/ejercicios" element={<EjerciciosList />} />
-        <Route path="/ejercicios/crear" element={<EjercicioCreate />} />
-        <Route path="/ejercicios/:id" element={<EjercicioDetail />} />
-        <Route path="/ejercicios/editar/:id" element={<EjercicioEdit />} />
-        <Route path="/ejercicios/eliminar/:id" element={<EjercicioDelete />} />
-        
-        {/* Planes Routes */}
-        <Route path="/planes" element={<PlanesList />} />
-        <Route path="/planes/crear" element={<PlanCreate />} />
-        <Route path="/planes/:id" element={<PlanDetail />} />
-        <Route path="/planes/editar/:id" element={<PlanEdit />} />
-        <Route path="/planes/eliminar/:id" element={<PlanDelete />} />
-        
+              
         {/* Estadísticas Routes */}
         <Route path="/estadisticas" element={<EstadisticasList />} />
         <Route path="/estadisticas/crear" element={<EstadisticaCreate />} />

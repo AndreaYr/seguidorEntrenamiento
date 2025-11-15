@@ -14,7 +14,7 @@ const Hero = () => {
         <p className="text-lg text-gray-200 mb-6">
           Bienvenida a tu seguidor de entrenamiento, donde podrás llevar un control de tus rutinas
         </p>
-        <button onClick={() => navigate("/login")} className="px-6 py-3 bg-[#E63946] text-white font-semibold rounded hover:bg-[#b62734] transition">
+        <button onClick={() => navigate("/login")} className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded hover:bg-indigo-500 transition">
           Empezar ahora
         </button>
       </div>

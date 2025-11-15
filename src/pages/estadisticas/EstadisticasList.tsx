@@ -3,10 +3,23 @@ import { Link } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import axios from 'axios';
 
+interface Usuario {
+  primerNombre: string;
+  segundoNombre: string | null;
+  primerApellido: string;
+  segundoApellido: string | null;
+  correo: string;
+}
+
 interface Deportista {
   id_deportista: number;
-  nombre: string;
-  apellido: string;
+  id_usuario: number;
+  altura: number;
+  peso: number;
+  fechaNacimiento: string | null;
+  genero: string | null;
+  id_entrenador: number | null;
+  usuario: Usuario;
 }
 
 interface Reporte {
@@ -43,7 +56,12 @@ const EstadisticasList = () => {
 
   const getDeportistaName = (id: number) => {
     const deportista = deportistas.find(u => u.id_deportista === id);
-    return deportista ? `${deportista.nombre} ${deportista.apellido}` : id;
+    if (deportista && deportista.usuario) {
+      const nombre = deportista.usuario.primerNombre || '';
+      const apellido = deportista.usuario.primerApellido || '';
+      return `${nombre} ${apellido}`.trim();
+    }
+    return `Deportista ${id}`;
   };
 
   return (
@@ -55,7 +73,7 @@ const EstadisticasList = () => {
             to="/estadisticas/crear"
             className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition"
           >
-            ➕ Generar Reporte
+           Generar Reporte
           </Link>
         </div>
 
@@ -92,7 +110,7 @@ const EstadisticasList = () => {
                 <div className="flex gap-2">
                   <Link
                     to={`/estadisticas/${est.id_reporte}`}
-                    className="flex-1 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-center"
+                    className="flex-1 px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-center"
                   >
                     Ver
                   </Link>
@@ -113,5 +131,3 @@ const EstadisticasList = () => {
 };
   
 export default EstadisticasList;
-
-
