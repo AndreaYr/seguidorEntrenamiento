@@ -3,6 +3,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import ConsultasRapidas from './pages/consultasRapidas/consultasRapidas';
 
 // Usuarios
 import UsuariosList from './pages/usuarios/UsuariosList';
@@ -79,6 +80,9 @@ function App() {
         <Route path="/retos/:id" element={<RetoDetail />} />
         <Route path="/retos/editar/:id" element={<RetoEdit />} />
         <Route path="/retos/eliminar/:id" element={<RetoDelete />} />
+
+        {/* Consultas Rápidas Routes */}
+        <Route path="/consultas" element={<ConsultasRapidas />} />
       </Routes>
     
     </Router>
