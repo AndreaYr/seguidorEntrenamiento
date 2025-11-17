@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -29,7 +30,7 @@ interface Deportista {
 interface Entrenador {
   id_entrenador: number;
   id_usuario: number;
-  id_experiencia?: number;
+  experiencia?: string | null;
   usuario?: Usuario;
 }
 
@@ -42,6 +43,11 @@ interface NuevoDeportistaForm {
   altura: number;
 }
 
+interface EntrenadorForm {
+  id_usuario: number;
+  experiencia: string;
+}
+
 const UsuarioList = () => {
   const navigate = useNavigate();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -52,23 +58,14 @@ const UsuarioList = () => {
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('todos');
   
-  // Estados para la sección de asignación
-  const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
-  const [entrenadorSeleccionado, setEntrenadorSeleccionado] = useState<number | null>(null);
-  const [deportistasSeleccionados, setDeportistasSeleccionados] = useState<number[]>([]);
-  const [asignando, setAsignando] = useState(false);
+  // Estados para completar datos de entrenadores
+  const [mostrarCompletarEntrenadores, setMostrarCompletarEntrenadores] = useState(false);
+  const [entrenadorEditando, setEntrenadorEditando] = useState<EntrenadorForm | null>(null);
+  const [guardandoEntrenador, setGuardandoEntrenador] = useState(false);
 
-  // Estados para el formulario de datos adicionales
-  const [mostrarFormularioDatos, setMostrarFormularioDatos] = useState(false);
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<Usuario | null>(null);
-  const [formDatos, setFormDatos] = useState<NuevoDeportistaForm>({
-    id_usuario: 0,
-    id_entrenador: null,
-    genero: '',
-    fechaNacimiento: '',
-    peso: 0,
-    altura: 0
-  });
+  // Estados para formularios inline de deportistas
+  const [deportistasEditando, setDeportistasEditando] = useState<{[key: number]: NuevoDeportistaForm}>({});
+  const [guardandoDeportista, setGuardandoDeportista] = useState<number | null>(null);
 
   // Cargar usuarios REALES desde el backend
   const cargarUsuarios = async () => {
@@ -92,6 +89,20 @@ const UsuarioList = () => {
       const response = await axios.get('http://localhost:3000/deportistas');
       console.log('Deportistas cargados desde BD:', response.data);
       setDeportistas(response.data);
+      
+      // Inicializar formularios inline
+      const forms: {[key: number]: NuevoDeportistaForm} = {};
+      response.data.forEach((deportista: Deportista) => {
+        forms[deportista.id_usuario] = {
+          id_usuario: deportista.id_usuario,
+          id_entrenador: deportista.id_entrenador || null,
+          genero: deportista.genero || '',
+          fechaNacimiento: deportista.fechaNacimiento || '',
+          peso: deportista.peso || 0,
+          altura: deportista.altura || 0
+        };
+      });
+      setDeportistasEditando(forms);
     } catch (error) {
       console.error('Error cargando deportistas:', error);
       toast.error('Error al cargar los deportistas');
@@ -99,30 +110,31 @@ const UsuarioList = () => {
     }
   };
 
-  // Cargar entrenadores desde los usuarios
-  const cargarEntrenadores = () => {
-    const usuariosEntrenadores = usuarios.filter(u => u.rol === 'entrenador');
-    const entrenadoresData: Entrenador[] = usuariosEntrenadores.map(usuario => ({
-      id_entrenador: usuario.id_usuario,
-      id_usuario: usuario.id_usuario,
-      usuario: usuario
-    }));
-    setEntrenadores(entrenadoresData);
+  // Cargar entrenadores desde el backend
+  const cargarEntrenadores = async () => {
+    try {
+      const response = await axios.get('http://localhost:3000/entrenadores');
+      console.log('Entrenadores cargados desde BD:', response.data);
+      setEntrenadores(response.data);
+    } catch (error: any) {
+      console.error('Error cargando entrenadores:', error);
+      if (error.response?.status === 404) {
+        console.log('Ruta de entrenadores no encontrada, inicializando array vacío');
+      } else {
+        toast.error('Error al cargar los entrenadores');
+      }
+      setEntrenadores([]);
+    }
   };
 
   useEffect(() => {
     const cargarDatos = async () => {
       await cargarUsuarios();
       await cargarDeportistasExistentes();
+      await cargarEntrenadores();
     };
     cargarDatos();
   }, []);
-
-  useEffect(() => {
-    if (usuarios.length > 0) {
-      cargarEntrenadores();
-    }
-  }, [usuarios]);
 
   // Filtrar usuarios
   const usuariosFiltrados = usuarios.filter(usuario => {
@@ -152,129 +164,155 @@ const UsuarioList = () => {
     }
   };
 
-  // Funciones para la asignación de deportistas
-  const handleSeleccionarDeportista = (idDeportista: number) => {
-    setDeportistasSeleccionados(prev => 
-      prev.includes(idDeportista) 
-        ? prev.filter(id => id !== idDeportista)
-        : [...prev, idDeportista]
-    );
+  // Funciones para completar datos de entrenadores
+  const handleCompletarDatosEntrenador = (usuario: Usuario) => {
+    // Buscar si ya existe en la tabla entrenadores
+    const entrenadorExistente = entrenadores.find(e => e.id_usuario === usuario.id_usuario);
+    
+    setEntrenadorEditando({
+      id_usuario: usuario.id_usuario,
+      experiencia: entrenadorExistente?.experiencia || ''
+    });
   };
 
-  const handleAsignarDeportistas = async () => {
-    if (!entrenadorSeleccionado || deportistasSeleccionados.length === 0) {
-      toast.error('Selecciona un entrenador y al menos un deportista');
-      return;
-    }
+  const handleGuardarDatosEntrenador = async () => {
+    if (!entrenadorEditando) return;
 
     try {
-      setAsignando(true);
+      setGuardandoEntrenador(true);
       
-      // Asignar cada deportista seleccionado al entrenador usando PUT
-      for (const idDeportista of deportistasSeleccionados) {
-        const deportista = deportistas.find(d => d.id_deportista === idDeportista);
-        if (deportista) {
-          try {
-            // Usar PUT en lugar de PATCH para evitar problemas CORS
-            await axios.put(`http://localhost:3000/deportistas/${idDeportista}`, {
-              ...deportista, // Mantener todos los datos existentes
-              id_entrenador: entrenadorSeleccionado // Solo cambiar el entrenador
-            });
-            console.log(`Deportista ${idDeportista} actualizado correctamente`);
-          } catch (error) {
-            console.error(`Error actualizando deportista ${idDeportista}:`, error);
-            throw new Error(`No se pudo actualizar el deportista ${idDeportista}`);
-          }
-        }
-      }
+      const entrenadorData = {
+        id_usuario: entrenadorEditando.id_usuario,
+        experiencia: entrenadorEditando.experiencia
+      };
 
-      toast.success(`Deportistas asignados exitosamente al entrenador`);
+      console.log('Guardando datos de entrenador:', entrenadorData);
+
+      // Verificar si el entrenador ya existe
+      const entrenadorExistente = entrenadores.find(e => e.id_usuario === entrenadorEditando.id_usuario);
       
-      // Recargar datos
-      await cargarDeportistasExistentes();
+      let response;
+      if (entrenadorExistente) {
+        // Actualizar entrenador existente
+        response = await axios.put(`http://localhost:3000/entrenadores/${entrenadorExistente.id_entrenador}`, entrenadorData);
+        console.log('Entrenador actualizado:', response.data);
+        toast.success('Datos de entrenador actualizados exitosamente');
+      } else {
+        // Crear nuevo entrenador
+        response = await axios.post('http://localhost:3000/entrenadores', entrenadorData);
+        console.log('Entrenador creado:', response.data);
+        toast.success('Datos de entrenador guardados exitosamente');
+      }
       
-      // Limpiar selección
-      setDeportistasSeleccionados([]);
-      setEntrenadorSeleccionado(null);
-      setMostrarAsignacion(false);
+      // Recargar entrenadores
+      await cargarEntrenadores();
+      setEntrenadorEditando(null);
       
-    } catch (error) {
-      console.error('Error asignando deportistas:', error);
-      toast.error('Error al asignar los deportistas');
+    } catch (error: any) {
+      console.error('Error guardando datos de entrenador:', error);
+      console.error('Error response:', error.response?.data);
+      
+      if (error.response?.data?.error) {
+        toast.error(`Error: ${error.response.data.error}`);
+      } else if (error.response?.data?.message) {
+        toast.error(`Error: ${error.response.data.message}`);
+      } else if (error.response?.data?.errors) {
+        // Manejar errores de validación
+        const validationErrors = error.response.data.errors.map((err: any) => err.msg).join(', ');
+        toast.error(`Error de validación: ${validationErrors}`);
+      } else {
+        toast.error('Error al guardar los datos del entrenador');
+      }
     } finally {
-      setAsignando(false);
+      setGuardandoEntrenador(false);
     }
   };
 
-  // Funciones para el formulario de datos adicionales
-  const handleCompletarDatosDeportista = (usuario: Usuario) => {
-    setUsuarioSeleccionado(usuario);
-    
-    // Buscar si ya existe un deportista para este usuario
-    const deportistaExistente = deportistas.find(d => d.id_usuario === usuario.id_usuario);
-    
-    setFormDatos({
-      id_usuario: usuario.id_usuario,
-      id_entrenador: deportistaExistente?.id_entrenador || null,
-      genero: deportistaExistente?.genero || '',
-      fechaNacimiento: deportistaExistente?.fechaNacimiento || '',
-      peso: deportistaExistente?.peso || 0,
-      altura: deportistaExistente?.altura || 0
-    });
-    
-    setMostrarFormularioDatos(true);
+  // Funciones para formularios inline de deportistas
+  const handleCambioDatosDeportista = (idUsuario: number, campo: string, valor: any) => {
+    setDeportistasEditando(prev => ({
+      ...prev,
+      [idUsuario]: {
+        ...prev[idUsuario],
+        [campo]: valor
+      }
+    }));
   };
 
-  const handleSubmitDatosDeportista = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGuardarDatosDeportista = async (idUsuario: number) => {
+    const datos = deportistasEditando[idUsuario];
     
-    if (!formDatos.peso || formDatos.peso <= 0 || !formDatos.altura || formDatos.altura <= 0) {
+    if (!datos.peso || datos.peso <= 0 || !datos.altura || datos.altura <= 0) {
       toast.error('Peso y altura son obligatorios y deben ser mayores a 0');
       return;
     }
 
     try {
+      setGuardandoDeportista(idUsuario);
+      
+      // Preparar datos sin id_usuario para actualizaciones
       const deportistaData = {
-        id_usuario: formDatos.id_usuario,
-        id_entrenador: formDatos.id_entrenador,
-        genero: formDatos.genero || null,
-        fechaNacimiento: formDatos.fechaNacimiento || null,
-        peso: formDatos.peso,
-        altura: formDatos.altura
+        id_entrenador: datos.id_entrenador,
+        genero: datos.genero || null,
+        fechaNacimiento: datos.fechaNacimiento || null,
+        peso: datos.peso,
+        altura: datos.altura
       };
 
       console.log('Enviando datos de deportista:', deportistaData);
 
       // Verificar si el deportista ya existe
-      const deportistaExistente = deportistas.find(d => d.id_usuario === formDatos.id_usuario);
+      const deportistaExistente = deportistas.find(d => d.id_usuario === idUsuario);
       
       let response;
       if (deportistaExistente) {
-        // Actualizar deportista existente
+        // Actualizar deportista existente - NO enviar id_usuario
         response = await axios.put(`http://localhost:3000/deportistas/${deportistaExistente.id_deportista}`, deportistaData);
         console.log('Deportista actualizado:', response.data);
         toast.success('Datos de deportista actualizados exitosamente');
       } else {
-        // Crear nuevo deportista
-        response = await axios.post('http://localhost:3000/deportistas', deportistaData);
+        // Crear nuevo deportista - SÍ enviar id_usuario
+        const createData = {
+          ...deportistaData,
+          id_usuario: idUsuario  // Solo para creación
+        };
+        response = await axios.post('http://localhost:3000/deportistas', createData);
         console.log('Deportista creado:', response.data);
         toast.success('Datos de deportista guardados exitosamente');
       }
-      
-      setMostrarFormularioDatos(false);
-      setUsuarioSeleccionado(null);
       
       // Recargar deportistas
       await cargarDeportistasExistentes();
       
     } catch (error: any) {
       console.error('Error guardando datos de deportista:', error);
-      if (error.response?.data?.message) {
+      if (error.response?.data?.error) {
+        toast.error(`Error: ${error.response.data.error}`);
+      } else if (error.response?.data?.message) {
         toast.error(`Error: ${error.response.data.message}`);
       } else {
         toast.error('Error al guardar los datos del deportista');
       }
+    } finally {
+      setGuardandoDeportista(null);
     }
+  };
+
+  // Inicializar formulario para un nuevo deportista
+  const inicializarFormularioDeportista = (usuario: Usuario) => {
+    const deportistaExistente = deportistas.find(d => d.id_usuario === usuario.id_usuario);
+    
+    setDeportistasEditando(prev => ({
+      ...prev,
+      [usuario.id_usuario]: {
+        id_usuario: usuario.id_usuario,
+        id_entrenador: deportistaExistente?.id_entrenador || null,
+        genero: deportistaExistente?.genero || '',
+        fechaNacimiento: deportistaExistente?.fechaNacimiento || '',
+        peso: deportistaExistente?.peso || 0,
+        altura: deportistaExistente?.altura || 0
+      }
+    }));
   };
 
   const getNombreCompleto = (usuario: Usuario) => {
@@ -299,17 +337,16 @@ const UsuarioList = () => {
     return roles[rol] || rol;
   };
 
-  // Obtener deportistas sin entrenador asignado
-  const deportistasSinEntrenador = deportistas.filter(d => !d.id_entrenador);
-
-  // Obtener usuarios que son deportistas pero no tienen registro en deportistas
-  const usuariosDeportistasSinRegistro = usuarios.filter(usuario => 
-    usuario.rol === 'deportista' && 
-    !deportistas.some(d => d.id_usuario === usuario.id_usuario)
+  // Obtener usuarios que son entrenadores pero no tienen registro en entrenadores
+  const usuariosEntrenadoresSinRegistro = usuarios.filter(usuario => 
+    usuario.rol === 'entrenador' && 
+    !entrenadores.some(e => e.id_usuario === usuario.id_usuario)
   );
 
-  // Obtener entrenador seleccionado
-  const entrenadorActual = entrenadores.find(e => e.id_entrenador === entrenadorSeleccionado);
+  // Obtener entrenadores disponibles para deportistas (solo los que tienen datos completos)
+  const entrenadoresDisponibles = entrenadores.filter(entrenador => 
+    entrenador.experiencia && entrenador.experiencia.trim() !== ''
+  );
 
   if (loading) {
     return (
@@ -329,11 +366,11 @@ const UsuarioList = () => {
           <h1 className="text-3xl font-bold text-gray-800">Gestión de Usuarios</h1>
           <div className="flex gap-2">
             <button
-              onClick={() => setMostrarAsignacion(!mostrarAsignacion)}
+              onClick={() => setMostrarCompletarEntrenadores(!mostrarCompletarEntrenadores)}
               className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition flex items-center gap-2"
             >
-              <span>👥</span>
-              <span>Asignar Deportistas</span>
+              <span>🏋️</span>
+              <span>Completar Datos Entrenadores</span>
             </button>
             <button
               onClick={() => navigate('/usuarios/crear')}
@@ -345,123 +382,54 @@ const UsuarioList = () => {
           </div>
         </div>
 
-        {/* Modal para completar datos de deportista */}
-        {mostrarFormularioDatos && usuarioSeleccionado && (
+        {/* Modal para completar datos de entrenador */}
+        {entrenadorEditando && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                {deportistas.some(d => d.id_usuario === usuarioSeleccionado.id_usuario) 
-                  ? 'Actualizar Datos de Deportista' 
-                  : 'Completar Datos de Deportista'
-                }
+                Completar Datos de Entrenador
               </h2>
-              <p className="text-gray-600 mb-4">
-                {deportistas.some(d => d.id_usuario === usuarioSeleccionado.id_usuario)
-                  ? 'Actualiza los datos para:'
-                  : 'Completa los datos para:'
-                } <strong>{getNombreCompleto(usuarioSeleccionado)}</strong>
-              </p>
               
-              <form onSubmit={handleSubmitDatosDeportista}>
+              <form onSubmit={(e) => { e.preventDefault(); handleGuardarDatosEntrenador(); }}>
                 <div className="space-y-4">
-                  {/* Género */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Género
-                    </label>
-                    <select
-                      value={formDatos.genero}
-                      onChange={(e) => setFormDatos({...formDatos, genero: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="">Seleccionar género</option>
-                      <option value="masculino">Masculino</option>
-                      <option value="femenino">Femenino</option>
-                      <option value="otro">Otro</option>
-                    </select>
-                  </div>
-
-                  {/* Fecha de Nacimiento */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fecha de Nacimiento
+                      Entrenador
                     </label>
                     <input
-                      type="date"
-                      value={formDatos.fechaNacimiento}
-                      onChange={(e) => setFormDatos({...formDatos, fechaNacimiento: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      type="text"
+                      value={getNombreCompleto(usuarios.find(u => u.id_usuario === entrenadorEditando.id_usuario)!)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                      disabled
                     />
                   </div>
 
-                  {/* Peso */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Peso (kg) *
+                      Experiencia *
                     </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={formDatos.peso || ''}
-                      onChange={(e) => setFormDatos({...formDatos, peso: parseFloat(e.target.value) || 0})}
+                    <textarea
+                      value={entrenadorEditando.experiencia}
+                      onChange={(e) => setEntrenadorEditando({...entrenadorEditando, experiencia: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      rows={4}
+                      placeholder="Describe la experiencia del entrenador..."
                       required
                     />
-                  </div>
-
-                  {/* Altura */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Altura (cm) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={formDatos.altura || ''}
-                      onChange={(e) => setFormDatos({...formDatos, altura: parseFloat(e.target.value) || 0})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      required
-                    />
-                  </div>
-
-                  {/* Entrenador Asignado */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Entrenador Asignado (Opcional)
-                    </label>
-                    <select
-                      value={formDatos.id_entrenador || ''}
-                      onChange={(e) => setFormDatos({...formDatos, id_entrenador: e.target.value ? Number(e.target.value) : null})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="">Sin entrenador asignado</option>
-                      {entrenadores.map(entrenador => (
-                        <option key={entrenador.id_entrenador} value={entrenador.id_entrenador}>
-                          {entrenador.usuario ? getNombreCompleto(entrenador.usuario) : `Entrenador ${entrenador.id_entrenador}`}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 
                 <div className="flex gap-2 mt-6">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                    disabled={guardandoEntrenador}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:bg-green-300"
                   >
-                    {deportistas.some(d => d.id_usuario === usuarioSeleccionado.id_usuario)
-                      ? 'Actualizar Datos'
-                      : 'Guardar Datos'
-                    }
+                    {guardandoEntrenador ? 'Guardando...' : 'Guardar Datos'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setMostrarFormularioDatos(false);
-                      setUsuarioSeleccionado(null);
-                    }}
+                    onClick={() => setEntrenadorEditando(null)}
                     className="flex-1 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
                   >
                     Cancelar
@@ -472,122 +440,70 @@ const UsuarioList = () => {
           </div>
         )}
 
-        {/* Sección de Asignación de Deportistas */}
-        {mostrarAsignacion && (
+        {/* Sección para completar datos de entrenadores */}
+        {mostrarCompletarEntrenadores && (
           <div className="mb-8 p-6 border border-gray-200 rounded-lg bg-gray-50">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Asignar Deportistas a Entrenador</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Completar Datos de Entrenadores</h2>
             
-            {/* Selección de Entrenador */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Seleccionar Entrenador
-              </label>
-              <select
-                value={entrenadorSeleccionado || ''}
-                onChange={(e) => setEntrenadorSeleccionado(e.target.value ? Number(e.target.value) : null)}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="">Selecciona un entrenador</option>
-                {entrenadores.map(entrenador => (
-                  <option key={entrenador.id_entrenador} value={entrenador.id_entrenador}>
-                    {entrenador.usuario ? getNombreCompleto(entrenador.usuario) : `Entrenador ${entrenador.id_entrenador}`}
-                  </option>
-                ))}
-              </select>
+            {/* Estadísticas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="text-green-600 font-semibold">Entrenadores Registrados</div>
+                <div className="text-2xl font-bold text-green-700">{entrenadores.length}</div>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="text-blue-600 font-semibold">Con Datos Completos</div>
+                <div className="text-2xl font-bold text-blue-700">
+                  {entrenadores.filter(e => e.experiencia && e.experiencia.trim() !== '').length}
+                </div>
+              </div>
+              <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <div className="text-yellow-600 font-semibold">Sin Datos Completos</div>
+                <div className="text-2xl font-bold text-yellow-700">
+                  {usuariosEntrenadoresSinRegistro.length + entrenadores.filter(e => !e.experiencia || e.experiencia.trim() === '').length}
+                </div>
+              </div>
             </div>
 
-            {/* Entrenador seleccionado */}
-            {entrenadorActual && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Entrenador seleccionado:</strong> {entrenadorActual.usuario && getNombreCompleto(entrenadorActual.usuario)}
-                </p>
-              </div>
-            )}
-
-            {/* Lista de Deportistas Disponibles */}
+            {/* Lista de entrenadores que necesitan datos */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Deportistas sin entrenador asignado ({deportistasSinEntrenador.length})
+                Entrenadores que necesitan datos ({usuariosEntrenadoresSinRegistro.length})
               </label>
               <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
-                {deportistasSinEntrenador.length === 0 ? (
+                {usuariosEntrenadoresSinRegistro.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">
-                    No hay deportistas sin entrenador asignado
+                    Todos los entrenadores tienen datos completos
                   </div>
                 ) : (
-                  deportistasSinEntrenador.map(deportista => (
-                    <div key={deportista.id_deportista} className="flex items-center p-3 border-b border-gray-200 hover:bg-gray-100">
-                      <input
-                        type="checkbox"
-                        checked={deportistasSeleccionados.includes(deportista.id_deportista)}
-                        onChange={() => handleSeleccionarDeportista(deportista.id_deportista)}
-                        className="mr-3 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                      <div className="flex-1">
+                  usuariosEntrenadoresSinRegistro.map(usuario => (
+                    <div key={usuario.id_usuario} className="flex items-center justify-between p-3 border-b border-gray-200 hover:bg-gray-100">
+                      <div>
                         <div className="font-medium text-gray-900">
-                          {deportista.usuario ? getNombreCompleto(deportista.usuario) : `Deportista ${deportista.id_deportista}`}
+                          {getNombreCompleto(usuario)}
                         </div>
                         <div className="text-sm text-gray-500">
-                          ID: {deportista.id_deportista} | 
-                          Peso: {deportista.peso || 'No definido'}kg | 
-                          Altura: {deportista.altura || 'No definida'}cm
+                          Email: {usuario.correo}
                         </div>
                       </div>
+                      <button
+                        onClick={() => handleCompletarDatosEntrenador(usuario)}
+                        className="px-4 py-2 bg-orange-500 text-white text-sm rounded hover:bg-orange-600 transition"
+                      >
+                        Completar Datos
+                      </button>
                     </div>
                   ))
                 )}
               </div>
             </div>
 
-            {/* Botones de acción */}
-            <div className="flex gap-2">
-              <button
-                onClick={handleAsignarDeportistas}
-                disabled={!entrenadorSeleccionado || deportistasSeleccionados.length === 0 || asignando}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {asignando ? 'Asignando...' : `Asignar ${deportistasSeleccionados.length} deportista(s)`}
-              </button>
-              <button
-                onClick={() => {
-                  setMostrarAsignacion(false);
-                  setEntrenadorSeleccionado(null);
-                  setDeportistasSeleccionados([]);
-                }}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Alert para usuarios deportistas sin datos completos */}
-        {usuariosDeportistasSinRegistro.length > 0 && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="text-yellow-600 mr-3">⚠️</div>
-              <div>
-                <h3 className="text-sm font-semibold text-yellow-800">
-                  {usuariosDeportistasSinRegistro.length} deportista(s) necesita(n) datos adicionales
-                </h3>
-                <p className="text-sm text-yellow-700 mt-1">
-                  Los siguientes usuarios tienen rol de deportista pero no tienen registro en la base de datos.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {usuariosDeportistasSinRegistro.map(usuario => (
-                    <button
-                      key={usuario.id_usuario}
-                      onClick={() => handleCompletarDatosDeportista(usuario)}
-                      className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded hover:bg-yellow-200 transition border border-yellow-300"
-                    >
-                      {getNombreCompleto(usuario)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <button
+              onClick={() => setMostrarCompletarEntrenadores(false)}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+            >
+              Cerrar
+            </button>
           </div>
         )}
 
@@ -676,9 +592,13 @@ const UsuarioList = () => {
             <tbody>
               {usuariosFiltrados.map((usuario) => {
                 const esDeportista = usuario.rol === 'deportista';
+                const esEntrenador = usuario.rol === 'entrenador';
                 const deportista = deportistas.find(d => d.id_usuario === usuario.id_usuario);
-                const tieneRegistro = !!deportista;
-                const tieneDatosCompletos = deportista && deportista.peso > 0 && deportista.altura > 0;
+                const entrenador = entrenadores.find(e => e.id_usuario === usuario.id_usuario);
+                
+                const tieneRegistroDeportista = !!deportista;
+                const tieneDatosCompletosDeportista = deportista && deportista.peso > 0 && deportista.altura > 0;
+                const tieneDatosCompletosEntrenador = entrenador && entrenador.experiencia && entrenador.experiencia.trim() !== '';
                 
                 return (
                   <tr key={usuario.id_usuario} className="hover:bg-gray-50">
@@ -701,14 +621,26 @@ const UsuarioList = () => {
                     <td className="px-6 py-4 border-b border-gray-200">
                       {esDeportista && (
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          !tieneRegistro 
+                          !tieneRegistroDeportista 
                             ? 'bg-red-100 text-red-800'
-                            : tieneDatosCompletos 
+                            : tieneDatosCompletosDeportista 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {!tieneRegistro ? 'Sin Registro' : 
-                           tieneDatosCompletos ? 'Datos Completos' : 'Datos Incompletos'}
+                          {!tieneRegistroDeportista ? 'Sin Registro' : 
+                           tieneDatosCompletosDeportista ? 'Datos Completos' : 'Datos Incompletos'}
+                        </span>
+                      )}
+                      {esEntrenador && (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          !entrenador 
+                            ? 'bg-red-100 text-red-800'
+                            : tieneDatosCompletosEntrenador 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {!entrenador ? 'Sin Registro' : 
+                           tieneDatosCompletosEntrenador ? 'Datos Completos' : 'Datos Incompletos'}
                         </span>
                       )}
                     </td>
@@ -728,22 +660,6 @@ const UsuarioList = () => {
                         >
                           Editar
                         </button>
-                        {/* Acción COMPLETAR DATOS para deportistas */}
-                        {esDeportista && (
-                          <button
-                            onClick={() => handleCompletarDatosDeportista(usuario)}
-                            className={`px-3 py-1 text-white text-sm rounded transition ${
-                              !tieneRegistro 
-                                ? 'bg-red-500 hover:bg-red-600' 
-                                : tieneDatosCompletos 
-                                ? 'bg-orange-500 hover:bg-orange-600' 
-                                : 'bg-yellow-500 hover:bg-yellow-600'
-                            }`}
-                          >
-                            {!tieneRegistro ? 'Crear Registro' : 
-                             tieneDatosCompletos ? 'Editar Datos' : 'Completar Datos'}
-                          </button>
-                        )}
                         {/* Acción ELIMINAR */}
                         <button
                           onClick={() => handleEliminarUsuario(usuario.id_usuario)}
@@ -760,6 +676,150 @@ const UsuarioList = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Sección de Formularios para Deportistas */}
+        {usuariosFiltrados.some(u => u.rol === 'deportista') && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Gestión de Datos de Deportistas</h2>
+            
+            {/* Información sobre entrenadores disponibles */}
+            {entrenadoresDisponibles.length === 0 && (
+              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-yellow-800 text-sm">
+                  ⚠️ No hay entrenadores disponibles. Completa los datos de los entrenadores primero.
+                </p>
+              </div>
+            )}
+
+            {/* Cabecera de la tabla de deportistas */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Deportista
+                    </th>
+                    <th className="px-6 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Género
+                    </th>
+                    <th className="px-6 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Fecha Nacimiento
+                    </th>
+                    <th className="px-6 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Peso (kg)
+                    </th>
+                    <th className="px-6 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Altura (cm)
+                    </th>
+                    <th className="px-6 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Entrenador
+                    </th>
+                    <th className="px-6 py-3 border-b-2 border-gray-200 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usuariosFiltrados
+                    .filter(usuario => usuario.rol === 'deportista')
+                    .map((usuario) => {
+                      const datos = deportistasEditando[usuario.id_usuario];
+                      const deportistaExistente = deportistas.find(d => d.id_usuario === usuario.id_usuario);
+                      
+                      // Inicializar formulario si no existe
+                      if (!datos) {
+                        inicializarFormularioDeportista(usuario);
+                        return null;
+                      }
+
+                      return (
+                        <tr key={usuario.id_usuario} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 border-b border-gray-200">
+                            <div className="text-sm font-medium text-gray-900">
+                              {getNombreCompleto(usuario)}
+                            </div>
+                            <div className="text-xs text-gray-500">ID: {usuario.id_usuario}</div>
+                          </td>
+                          <td className="px-6 py-4 border-b border-gray-200">
+                            <select
+                              value={datos.genero}
+                              onChange={(e) => handleCambioDatosDeportista(usuario.id_usuario, 'genero', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                            >
+                              <option value="">Seleccionar</option>
+                              <option value="masculino">Masculino</option>
+                              <option value="femenino">Femenino</option>
+                              <option value="otro">Otro</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 border-b border-gray-200">
+                            <input
+                              type="date"
+                              value={datos.fechaNacimiento}
+                              onChange={(e) => handleCambioDatosDeportista(usuario.id_usuario, 'fechaNacimiento', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                            />
+                          </td>
+                          <td className="px-6 py-4 border-b border-gray-200">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={datos.peso || ''}
+                              onChange={(e) => handleCambioDatosDeportista(usuario.id_usuario, 'peso', parseFloat(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                              placeholder="Peso en kg"
+                            />
+                          </td>
+                          <td className="px-6 py-4 border-b border-gray-200">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={datos.altura || ''}
+                              onChange={(e) => handleCambioDatosDeportista(usuario.id_usuario, 'altura', parseFloat(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                              placeholder="Altura en cm"
+                            />
+                          </td>
+                          <td className="px-6 py-4 border-b border-gray-200">
+                            <select
+                              value={datos.id_entrenador || ''}
+                              onChange={(e) => handleCambioDatosDeportista(usuario.id_usuario, 'id_entrenador', e.target.value ? Number(e.target.value) : null)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                              disabled={entrenadoresDisponibles.length === 0}
+                            >
+                              <option value="">Sin entrenador</option>
+                              {entrenadoresDisponibles.map(entrenador => (
+                                <option key={entrenador.id_entrenador} value={entrenador.id_entrenador}>
+                                  {entrenador.usuario ? getNombreCompleto(entrenador.usuario) : `Entrenador ${entrenador.id_entrenador}`}
+                                </option>
+                              ))}
+                            </select>
+                            {entrenadoresDisponibles.length === 0 && (
+                              <p className="text-xs text-red-500 mt-1">
+                                Complete datos de entrenadores primero
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 border-b border-gray-200">
+                            <button
+                              onClick={() => handleGuardarDatosDeportista(usuario.id_usuario)}
+                              disabled={guardandoDeportista === usuario.id_usuario}
+                              className="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition disabled:bg-indigo-300 disabled:cursor-not-allowed"
+                            >
+                              {guardandoDeportista === usuario.id_usuario ? 'Guardando...' : 
+                               deportistaExistente ? 'Actualizar' : 'Crear'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {usuarios.length === 0 && (
           <div className="text-center py-12">

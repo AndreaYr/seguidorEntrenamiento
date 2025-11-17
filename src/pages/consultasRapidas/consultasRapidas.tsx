@@ -13,6 +13,7 @@ interface ConsultaConfig {
   descripcion: string;
   columnas: string[];
   icono: string;
+  endpoint: string;
 }
 
 const ConsultasRapidas: React.FC = () => {
@@ -22,183 +23,86 @@ const ConsultasRapidas: React.FC = () => {
   const [cargando, setCargando] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
-  // Datos de demostración para cada consulta
-  const datosDemo: { [key: string]: ConsultaData[] } = {
-    deportistas_entrenador: [
-      {
-        nombre_entrenador: 'Carlos',
-        apellido_entrenador: 'Rodríguez',
-        nombre_deportista: 'Ana',
-        apellido_deportista: 'García',
-        correo_deportista: 'ana.garcia@email.com',
-        peso: '58 kg',
-        altura: '165 cm'
-      },
-      {
-        nombre_entrenador: 'Carlos',
-        apellido_entrenador: 'Rodríguez',
-        nombre_deportista: 'Luis',
-        apellido_deportista: 'Martínez',
-        correo_deportista: 'luis.martinez@email.com',
-        peso: '75 kg',
-        altura: '178 cm'
-      },
-      {
-        nombre_entrenador: 'María',
-        apellido_entrenador: 'López',
-        nombre_deportista: 'Pedro',
-        apellido_deportista: 'Sánchez',
-        correo_deportista: 'pedro.sanchez@email.com',
-        peso: '82 kg',
-        altura: '182 cm'
-      }
-    ],
-    entrenamientos_recientes: [
-      {
-        nombre_deportista: 'Ana',
-        apellido_deportista: 'García',
-        fecha: '2024-01-15',
-        duracion: '45 min',
-        distancia: '8.5 km'
-      },
-      {
-        nombre_deportista: 'Luis',
-        apellido_deportista: 'Martínez',
-        fecha: '2024-01-14',
-        duracion: '60 min',
-        distancia: '12.2 km'
-      },
-      {
-        nombre_deportista: 'Pedro',
-        apellido_deportista: 'Sánchez',
-        fecha: '2024-01-14',
-        duracion: '30 min',
-        distancia: '5.8 km'
-      }
-    ],
-    retos_activos: [
-      {
-        id_reto: 'R001',
-        nombre: 'Reto 100KM Enero',
-        descripcion: 'Completa 100km en enero',
-        duracion_dias: 31,
-        estado: 'activo',
-        total_participantes: 15
-      },
-      {
-        id_reto: 'R002',
-        nombre: 'Maratón Virtual',
-        descripcion: 'Preparación para maratón',
-        duracion_dias: 60,
-        estado: 'activo',
-        total_participantes: 8
-      }
-    ],
-    metricas_generales: [
-      {
-        total_usuarios: 45,
-        total_deportistas: 32,
-        total_entrenadores: 5,
-        total_entrenamientos: 156,
-        deportistas_activos: 28,
-        distancia_promedio: '8.2 km',
-        total_retos: 12,
-        retos_activos: 3,
-        retos_finalizados: 9
-      }
-    ],
-    ranking_deportistas: [
-      {
-        id_deportista: 'D001',
-        nombre: 'Ana',
-        apellido: 'García',
-        correo: 'ana.garcia@email.com',
-        total_entrenamientos: 24,
-        distancia_total: '186.5 km',
-        tiempo_total_minutos: '1320 min'
-      },
-      {
-        id_deportista: 'D002',
-        nombre: 'Luis',
-        apellido: 'Martínez',
-        correo: 'luis.martinez@email.com',
-        total_entrenamientos: 18,
-        distancia_total: '154.2 km',
-        tiempo_total_minutos: '1080 min'
-      }
-    ]
-  };
-
   const consultas: ConsultaConfig[] = [
     {
       id: 'deportistas_entrenador',
       nombre: 'Deportistas por Entrenador',
       descripcion: 'Lista de deportistas agrupados por su entrenador asignado',
       columnas: ['nombre_entrenador', 'apellido_entrenador', 'nombre_deportista', 'apellido_deportista', 'correo_deportista', 'peso', 'altura'],
-      icono: '👥'
+      icono: '👥',
+      endpoint: '/consultas/deportistasPorEntrenador'
     },
     {
       id: 'entrenamientos_recientes',
       nombre: 'Entrenamientos Recientes',
       descripcion: 'Últimos 20 entrenamientos registrados en el sistema',
       columnas: ['nombre_deportista', 'apellido_deportista', 'fecha', 'duracion', 'distancia'],
-      icono: '🏃'
+      icono: '🏃',
+      endpoint: '/consultas/entrenamientosRecientes'
     },
     {
       id: 'retos_activos',
       nombre: 'Retos Activos',
       descripcion: 'Retos activos con cantidad de participantes',
       columnas: ['id_reto', 'nombre', 'descripcion', 'duracion_dias', 'estado', 'total_participantes'],
-      icono: '🏆'
+      icono: '🏆',
+      endpoint: '/consultas/retosActivos'
     },
     {
       id: 'progreso_mensual',
       nombre: 'Progreso Mensual',
       descripcion: 'Progreso de deportistas por mes',
       columnas: ['id_deportista', 'nombre', 'apellido', 'mes', 'distancia_total', 'tiempo_total_minutos', 'total_entrenamientos'],
-      icono: '📈'
+      icono: '📈',
+      endpoint: '/consultas/progresoMensual'
     },
     {
       id: 'estadisticas_basicas',
       nombre: 'Estadísticas Básicas',
       descripcion: 'Métricas generales del sistema',
       columnas: ['total_entrenamientos', 'distancia_promedio', 'duracion_promedio_minutos', 'deportistas_activos'],
-      icono: '📊'
+      icono: '📊',
+      endpoint: '/consultas/estadisticasDisciplina'
     },
     {
       id: 'ranking_deportistas',
       nombre: 'Ranking de Deportistas',
       descripcion: 'Top 15 deportistas por distancia total',
       columnas: ['id_deportista', 'nombre', 'apellido', 'correo', 'total_entrenamientos', 'distancia_total', 'tiempo_total_minutos'],
-      icono: '🥇'
+      icono: '🥇',
+      endpoint: '/consultas/rankingDeportistas'
     },
     {
       id: 'participacion_retos',
       nombre: 'Participación en Retos',
       descripcion: 'Participación de deportistas en retos',
       columnas: ['id_deportista', 'nombre', 'apellido', 'total_retos_participados', 'retos_completados', 'retos_activos'],
-      icono: '🎯'
+      icono: '🎯',
+      endpoint: '/consultas/participacionRetos'
     },
     {
       id: 'evolucion_rendimiento',
       nombre: 'Evolución del Rendimiento',
       descripcion: 'Evolución mensual del rendimiento por deportista',
       columnas: ['id_deportista', 'nombre', 'apellido', 'año', 'mes', 'mes_formateado', 'entrenamientos_mes', 'distancia_promedio', 'distancia_total_mes'],
-      icono: '🚀'
+      icono: '🚀',
+      endpoint: '/consultas/evolucionRendimiento'
     },
     {
       id: 'consistencia_entrenamiento',
       nombre: 'Consistencia en Entrenamientos',
       descripcion: 'Consistencia y frecuencia de entrenamientos',
       columnas: ['id_deportista', 'nombre', 'apellido', 'total_entrenamientos', 'dias_entrenados', 'primera_fecha', 'ultima_fecha'],
-      icono: '💪'
+      icono: '💪',
+      endpoint: '/consultas/consistenciaEntrenamiento'
     },
     {
       id: 'metricas_generales',
       nombre: 'Métricas Generales',
       descripcion: 'Métricas generales del sistema',
       columnas: ['total_usuarios', 'total_deportistas', 'total_entrenadores', 'total_entrenamientos', 'deportistas_activos', 'distancia_promedio', 'total_retos', 'retos_activos', 'retos_finalizados'],
-      icono: '🔍'
+      icono: '🔍',
+      endpoint: '/consultas/metricasGenerales'
     }
   ];
 
@@ -209,15 +113,64 @@ const ConsultasRapidas: React.FC = () => {
     setError('');
     
     try {
-      // Simular llamada a API con timeout
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const consulta = consultas.find(c => c.id === consultaId);
+      if (!consulta) {
+        throw new Error('Consulta no encontrada');
+      }
+
+      console.log(`🔍 Ejecutando: ${consulta.nombre}`);
+      console.log(`📡 Endpoint: ${consulta.endpoint}`);
+
+      const response = await fetch(`http://localhost:3000${consulta.endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log(`📊 Status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error response:', errorText);
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
       
-      // Usar datos de demostración
-      const result = datosDemo[consultaId] || [];
-      setDatos(result);
+      console.log('📦 Respuesta completa:', result);
+      
+      let datosReales;
+      
+      // Manejar diferentes formatos de respuesta
+      if (result.success !== undefined) {
+        // Formato: { success: true, data: [...] }
+        datosReales = result.data;
+        console.log('✅ Formato con campo success detectado');
+      } else {
+        // Formato directo: [...]
+        datosReales = result;
+        console.log('✅ Formato directo de array detectado');
+      }
+      
+      console.log('📊 Datos a mostrar:', datosReales);
+      
+      // Procesar los datos según el tipo
+      if (Array.isArray(datosReales)) {
+        setDatos(datosReales);
+        console.log(`✅ ${datosReales.length} registros cargados en tabla`);
+      } else if (typeof datosReales === 'object' && datosReales !== null) {
+        // Caso especial para métricas generales que es un objeto único
+        setDatos([datosReales]);
+        console.log('✅ Objeto único convertido a array de 1 elemento');
+      } else {
+        setDatos([]);
+        console.log('❌ No se pudieron procesar los datos');
+      }
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      console.error('❌ Error ejecutando consulta:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido al conectar con el servidor');
       setDatos([]);
     } finally {
       setCargando(false);
@@ -246,11 +199,14 @@ const ConsultasRapidas: React.FC = () => {
     if (typeof valor === 'number') {
       return valor % 1 === 0 ? valor.toString() : valor.toFixed(2);
     }
+    if (typeof valor === 'boolean') {
+      return valor ? 'Sí' : 'No';
+    }
     return String(valor);
   };
 
   const handleVolverAtras = () => {
-    navigate(-1); // Vuelve a la página anterior
+    navigate(-1);
   };
 
   const consultaActual = consultas.find(c => c.id === consultaSeleccionada);
@@ -313,6 +269,9 @@ const ConsultasRapidas: React.FC = () => {
               <div>
                 <h3 className="font-semibold text-indigo-800">{consultaActual.nombre}</h3>
                 <p className="text-sm text-indigo-600 mt-1">{consultaActual.descripcion}</p>
+                <p className="text-xs text-indigo-500 mt-2">
+                  Endpoint: {consultaActual.endpoint}
+                </p>
               </div>
             </div>
           </div>
@@ -324,7 +283,7 @@ const ConsultasRapidas: React.FC = () => {
         <div className="bg-white rounded-xl shadow-lg p-8 mb-6 text-center border border-indigo-100">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-lg text-gray-700 font-medium">Ejecutando consulta...</p>
-          <p className="text-sm text-gray-500 mt-2">Obteniendo los datos más recientes</p>
+          <p className="text-sm text-gray-500 mt-2">Conectando con el servidor</p>
         </div>
       )}
 
@@ -340,6 +299,12 @@ const ConsultasRapidas: React.FC = () => {
             <div className="ml-4">
               <h3 className="text-lg font-medium text-red-800">Error en la consulta</h3>
               <p className="text-red-700 mt-1">{error}</p>
+              <button 
+                onClick={() => ejecutarConsulta(consultaSeleccionada)}
+                className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-200 text-sm font-medium"
+              >
+                Reintentar
+              </button>
             </div>
           </div>
         </div>
@@ -359,7 +324,7 @@ const ConsultasRapidas: React.FC = () => {
                 </p>
               </div>
               <div className="text-indigo-100 text-sm font-medium bg-white bg-opacity-20 rounded-lg px-3 py-1">
-                Vista previa
+                Datos en tiempo real
               </div>
             </div>
           </div>
@@ -400,7 +365,7 @@ const ConsultasRapidas: React.FC = () => {
           
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
             <p className="text-sm text-gray-600 text-center">
-              💡 <strong>Nota:</strong> Esta es una vista previa con datos de demostración
+              ✅ <strong>Datos actualizados:</strong> Información en tiempo real del sistema
             </p>
           </div>
         </div>
