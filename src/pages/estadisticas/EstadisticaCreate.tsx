@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const EstadisticaCreate = () => {
   const navigate = useNavigate();
   const [deportistas, setDeportistas] = useState<any[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState<boolean>(false);
 
   const [formData, setFormData] = useState({
     id_deportista: '',
@@ -24,36 +24,111 @@ const EstadisticaCreate = () => {
   useEffect(() => {
     const fetchDeportistas = async () => {
       try {
-      
         const response = await axios.get('http://localhost:3000/deportistas');
-        console.log('✅ Datos recibidos de deportistas:', response.data);
-        
-        setDeportistas(response.data);
+        setDeportistas(response.data || []);
       } catch (error) {
         console.error('❌ Error cargando deportistas', error);
-      } finally {
-        setLoading(false);
       }
-    }
+    };
+
     fetchDeportistas();
   }, []);
 
   // Función para obtener el nombre del deportista seleccionado
   const getNombreDeportista = () => {
     if (!formData.id_deportista) return '';
-    
-    const deportista = deportistas.find(
-      dep => dep.id_deportista === Number(formData.id_deportista)
-    );
-    
+    const deportista = deportistas.find(dep => String(dep.id_deportista) === String(formData.id_deportista));
     if (deportista && deportista.usuario) {
       const nombre = deportista.usuario.primerNombre || '';
       const apellido = deportista.usuario.primerApellido || '';
-      
       return `${nombre} ${apellido}`.trim();
     }
-    
     return 'Deportista no encontrado';
+  };
+
+  // Cargar estadísticas: primero intentar con entrenamientos, luego endpoints específicos
+  const fetchEstadisticasDeportista = async (idDeportista: string) => {
+    if (!idDeportista) return;
+    setStatsLoading(true);
+    try {
+      const idNum = Number(idDeportista);
+
+      // 1) Intentar obtener entrenamientos y calcular localmente
+      try {
+        const respTrain = await axios.get(`http://localhost:3000/entrenamientos?deportistaId=${idNum}`);
+        const trainings = respTrain.data;
+        if (Array.isArray(trainings) && trainings.length > 0) {
+          const distanciaTotal = trainings.reduce((s: number, t: any) => s + (Number(t.distancia) || 0), 0);
+          const caloriasTotales = trainings.reduce((s: number, t: any) => s + (Number(t.caloriasQuemadas) || 0), 0);
+          const velocidadVals = trainings.map((t: any) => (t.velocidadPromedio != null ? Number(t.velocidadPromedio) : null)).filter((v: number | null) => v != null) as number[];
+          const velocidadPromedio = velocidadVals.length > 0 ? (velocidadVals.reduce((a, b) => a + b, 0) / velocidadVals.length) : 0;
+          const entrenamientosRealizados = trainings.length;
+          const fechas = trainings.map((t: any) => new Date(t.fecha));
+          const fechaInicioCalc = new Date(Math.min(...fechas.map(f => f.getTime()))).toISOString().split('T')[0];
+          const fechaFinCalc = new Date(Math.max(...fechas.map(f => f.getTime()))).toISOString().split('T')[0];
+
+          setFormData(prev => ({
+            ...prev,
+            distanciaTotal: String(Number(distanciaTotal.toFixed(1))),
+            caloriasTotales: String(caloriasTotales),
+            velocidadPromedio: String(Number(velocidadPromedio.toFixed(1))),
+            entrenamientosRealizados: String(entrenamientosRealizados),
+            fechaInicio: prev.fechaInicio || fechaInicioCalc,
+            fechaFin: prev.fechaFin || fechaFinCalc
+          }));
+
+          const dep = deportistas.find(d => String(d.id_deportista) === String(idDeportista));
+          const nombre = dep && dep.usuario ? `${dep.usuario.primerNombre || ''} ${dep.usuario.primerApellido || ''}`.trim() : '';
+          toast.success(`📊 Estadísticas calculadas localmente para ${nombre || 'el deportista'}`);
+          setStatsLoading(false);
+          return;
+        }
+      } catch (trainErr: any) {
+        // No hacer ruido, seguiremos intentando endpoints de estadísticas
+        console.debug('No se pudieron obtener entrenamientos (seguir con endpoints):', trainErr?.message ?? trainErr);
+      }
+
+      // 2) Intentar endpoints de estadísticas
+      try {
+        let resp;
+        try {
+          resp = await axios.get(`http://localhost:3000/estadisticas/deportista/${idNum}`);
+        } catch (_err: any) {
+          console.debug('Error intentando endpoint específico de estadísticas:', _err);
+          resp = await axios.get(`http://localhost:3000/estadisticas?deportistaId=${idNum}`);
+        }
+
+        const data = resp.data;
+        const stats = Array.isArray(data) && data.length > 0 ? data[0] : data;
+
+        if (stats) {
+          setFormData(prev => ({
+            ...prev,
+            distanciaTotal: stats.distanciaTotal ?? stats.distancia_total ?? prev.distanciaTotal,
+            caloriasTotales: stats.caloriasTotales ?? stats.calorias_totales ?? prev.caloriasTotales,
+            velocidadPromedio: stats.velocidadPromedio ?? stats.velocidad_promedio ?? prev.velocidadPromedio,
+            entrenamientosRealizados: stats.entrenamientosRealizados ?? stats.total_entrenamientos ?? prev.entrenamientosRealizados,
+            fechaInicio: stats.periodo?.desde ?? stats.fechaInicio ?? prev.fechaInicio,
+            fechaFin: stats.periodo?.hasta ?? stats.fechaFin ?? prev.fechaFin
+          }));
+
+          const dep = deportistas.find(d => String(d.id_deportista) === String(idDeportista));
+          const nombre = dep && dep.usuario ? `${dep.usuario.primerNombre || ''} ${dep.usuario.primerApellido || ''}`.trim() : '';
+          toast.success(`📊 Estadísticas cargadas para ${nombre || 'el deportista'}`);
+          setStatsLoading(false);
+          return;
+        }
+      } catch (statsErr: any) {
+        console.debug('Endpoints de estadísticas no disponibles o sin datos:', statsErr?.message ?? statsErr);
+      }
+
+      toast.info('No se encontraron datos para este deportista');
+      setStatsLoading(false);
+    } catch (error: any) {
+      console.error('Error cargando o calculando estadísticas:', error);
+      toast.error('Error al cargar o calcular estadísticas del deportista');
+      setStatsLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,11 +145,11 @@ const EstadisticaCreate = () => {
         entrenamientosRealizados: Number(formData.entrenamientosRealizados)
       });
 
-      alert('✅ Reporte generado exitosamente');
+      toast.success('✅ Reporte generado exitosamente');
       navigate('/estadisticas');
     } catch (error) {
       console.error('Error al crear el reporte:', error);
-      alert('❌ Error al generar el reporte');
+      toast.error('❌ Error al generar el reporte');
     }
   };
 
@@ -92,7 +167,11 @@ const EstadisticaCreate = () => {
     <DashboardLayout>
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h1 className="text-3xl font-bold mb-6">Generar Nuevo Reporte</h1>
-        
+
+        {statsLoading && (
+          <p className="text-sm text-gray-600 mb-3">Cargando estadísticas...</p>
+        )}
+
         {/* Mostrar nombre del deportista seleccionado */}
         {formData.id_deportista && (
           <div className="mb-4 p-3 bg-green-100 rounded-lg border border-green-300">
@@ -108,14 +187,19 @@ const EstadisticaCreate = () => {
             <select
               required
               value={formData.id_deportista}
-              onChange={(e) => setFormData({ ...formData, id_deportista: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormData({ ...formData, id_deportista: val });
+                // cargar estadísticas del deportista seleccionado
+                fetchEstadisticasDeportista(val);
+              }}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Seleccione un deportista</option>
               {deportistas.map(deportista => (
                 <option 
                   key={deportista.id_deportista} 
-                  value={deportista.id_deportista}
+                  value={deportista.id_deportista?.toString() ?? String(deportista.id_deportista)}
                 >
                   {getTextoOpcion(deportista)}
                 </option>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import axios from 'axios';
 
@@ -36,6 +36,8 @@ interface Reporte {
 const EstadisticasList = () => {
   const [estadisticas, setEstadisticas] = useState<Reporte[]>([]);
   const [deportistas, setDeportistas] = useState<Deportista[]>([]);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,6 +55,17 @@ const EstadisticasList = () => {
 
     fetchData();
   }, []);
+
+  // Si venimos desde la página de eliminación, actualizamos el estado local para remover el reporte eliminado
+  useEffect(() => {
+    const stateAny = (location.state ?? {}) as any;
+    if (stateAny && stateAny.deletedId) {
+      const deletedId = Number(stateAny.deletedId);
+      setEstadisticas(prev => prev.filter(e => e.id_reporte !== deletedId));
+      // limpiar el state de la ubicación para que la acción no se repita
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   const getDeportistaName = (id: number) => {
     const deportista = deportistas.find(u => u.id_deportista === id);

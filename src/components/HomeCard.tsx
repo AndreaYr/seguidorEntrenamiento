@@ -2,7 +2,6 @@ import Card1 from '../assets/img1.jpg';
 import Card2 from '../assets/gimnasio.jpg';
 import Card3 from '../assets/boxeo.png';
 import Card4 from '../assets/flexibilidad.jpg';
-import Card5 from '../assets/crossfit.jpg';
 import Card6 from '../assets/pole.jpg';
 import { useState } from 'react';
 
@@ -26,11 +25,6 @@ const cards = [
     img: Card4,
     title: "Flexibilidad",
     description: "Aumenta el rango de movimiento de tus musculos con estiramientos y ejercicios suaves.",
-  },
-  {
-    img: Card5,
-    title: "Crossfit",
-    description: "Entrena a alta intesidad con movimientos funcionales para mejorar tu condicion general",
   },
   {
     img: Card6,

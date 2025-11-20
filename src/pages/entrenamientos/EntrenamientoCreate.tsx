@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -60,12 +60,13 @@ const EntrenamientoCreate = () => {
     const cargarDeportistas = async () => {
       try {
         setCargandoDeportistas(true);
-        const response = await axios.get('http://localhost:3000/entrenamientos');
+        // Corregido: traer la lista de deportistas, no entrenamientos
+        const response = await axios.get('http://localhost:3000/deportistas');
         console.log('Deportistas cargados:', response.data);
-        setDeportistas(response.data);
-        
+        setDeportistas(response.data || []);
+
         // Establecer el primer deportista como valor por defecto
-        if (response.data.length > 0) {
+        if (response.data && response.data.length > 0) {
           setFormData(prev => ({
             ...prev,
             id_deportista: response.data[0].id_deportista.toString()
@@ -84,26 +85,51 @@ const EntrenamientoCreate = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    
-    console.log(`🔄 Cambio en campo ${name}:`, value);
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    // Evitar procesar eventos duplicados: si el valor no cambia, salimos
+    setFormData(prev => {
+      const prevVal = (prev as any)[name] ?? '';
+      if (prevVal === value) {
+        return prev; // sin cambios, evita re-render
+      }
 
-    // Si cambia la disciplina, limpiar campos que no aplican
-    if (name === 'disciplina') {
-      console.log('🔄 Cambiando disciplina a:', value);
-      
-      setFormData(prev => ({
-        ...prev,
-        disciplina: value,
-        ...(!disciplinasConDistancia.includes(value) && { distancia: '' }),
-        ...(!disciplinasConVelocidad.includes(value) && { velocidadPromedio: '' })
-      }));
-    }
+      const updated: any = { ...prev, [name]: value };
+
+      if (name === 'disciplina') {
+        if (!disciplinasConDistancia.includes(value)) updated.distancia = '';
+        if (!disciplinasConVelocidad.includes(value)) updated.velocidadPromedio = '';
+        updated.disciplina = value;
+      }
+
+      return updated;
+    });
   };
+
+  // useRef para comparar el formData previo y loguear cambios de forma controlada
+  const prevFormRef = useRef<EntrenamientoFormData | null>(null);
+
+  useEffect(() => {
+    if (!prevFormRef.current) {
+      prevFormRef.current = formData;
+      return;
+    }
+
+    const prev = prevFormRef.current;
+    // registrar cambios una sola vez por commit
+    if (prev.disciplina !== formData.disciplina) {
+      console.log('🔄 Cambiando disciplina a:', formData.disciplina);
+    } else {
+      // detectar cuál campo cambió para logs más legibles
+      const keys = Object.keys(formData) as (keyof EntrenamientoFormData)[];
+      for (const k of keys) {
+        if (formData[k] !== prev[k]) {
+          console.log(`🔄 Cambio en campo ${k}:`, formData[k]);
+          break;
+        }
+      }
+    }
+
+    prevFormRef.current = formData;
+  }, [formData]);
 
   const validateForm = (): boolean => {
     // Campos obligatorios para todas las disciplinas
@@ -147,10 +173,12 @@ const EntrenamientoCreate = () => {
         id_deportista: parseInt(formData.id_deportista)
       };
 
-      // Solo incluir distancia si aplica para la disciplina y tiene valor
-      if (disciplinasConDistancia.includes(formData.disciplina) && formData.distancia) {
-        dataToSend.distancia = parseFloat(formData.distancia);
-      }
+      // En algunos backends la columna `distancia` NO permite null.
+      // Enviar siempre un número: si la disciplina no requiere distancia o
+      // el campo está vacío, enviar 0 para evitar errores de notNull.
+      dataToSend.distancia = (disciplinasConDistancia.includes(formData.disciplina) && formData.distancia)
+        ? parseFloat(formData.distancia)
+        : 0;
 
       // Solo incluir velocidad si aplica para la disciplina y tiene valor
       if (disciplinasConVelocidad.includes(formData.disciplina) && formData.velocidadPromedio) {
@@ -174,19 +202,36 @@ const EntrenamientoCreate = () => {
         },
       });
 
-      console.log('✅ Respuesta del servidor:', response.data);
+      console.log('✅ Respuesta del servidor:', response.status, response.data);
 
-      if (response.data.success) {
+      // Aceptar distintos formatos de respuesta del backend:
+      // - { success: true }
+      // - objeto del entrenamiento creado (contiene id_entrenamiento)
+      const createdId = response.data?.id_entrenamiento ?? response.data?.id;
+      const successFlag = response.data?.success === true;
+
+      if (successFlag || createdId || (response.status >= 200 && response.status < 300)) {
         toast.success('Entrenamiento creado exitosamente!');
         navigate('/entrenamientos');
       } else {
-        toast.error(`Error: ${response.data.error}`);
+        const errMsg = response.data?.error || 'Respuesta inesperada del servidor';
+        toast.error(`Error: ${errMsg}`);
       }
     } catch (error: any) {
       console.error('❌ Error creando entrenamiento:', error);
-      
-      if (error.response?.data?.error) {
-        toast.error(`Error: ${error.response.data.error}`);
+
+      // Mostrar mensaje claro desde el servidor si está disponible
+      const resp = error.response;
+      if (resp && resp.data) {
+        const data = resp.data;
+        const serverMsg = data.error || data.message || (Array.isArray(data) ? data.join(', ') : null);
+        if (serverMsg) {
+          toast.error(`Error: ${serverMsg}`);
+        } else {
+          toast.error(`Error: ${JSON.stringify(data)}`);
+        }
+      } else if (error.message) {
+        toast.error(`Error: ${error.message}`);
       } else {
         toast.error('Error al crear el entrenamiento');
       }
@@ -238,7 +283,6 @@ const EntrenamientoCreate = () => {
                 <option value="ciclismo">🚴 Ciclismo</option>
                 <option value="natacion">🏊 Natación</option>
                 <option value="caminata">🚶 Caminata</option>
-                <option value="crossfit">💪 CrossFit</option>
                 <option value="yoga">🧘 Yoga</option>
               </select>
             </div>
@@ -359,7 +403,7 @@ const EntrenamientoCreate = () => {
                   disabled={loading || deportistas.length === 0}
                 >
                   {deportistas.map(deportista => (
-                    <option key={deportista.id_deportista} value={deportista.id_deportista}>
+                    <option key={deportista.id_deportista} value={deportista.id_deportista.toString()}>
                       {getNombreCompleto(deportista)}
                     </option>
                   ))}
